@@ -1,0 +1,5 @@
+version: '3.9'
+
+services:
+  Aurh_Service:
+    cmd
