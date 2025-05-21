@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"auth_service/config"
+	"auth_service/internal/config"
 	"auth_service/internal/services"
 	"encoding/json"
 	"net/http"
