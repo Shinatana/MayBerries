@@ -1,23 +1,14 @@
-FROM golang:1.23-alpine AS builder
-
-RUN apk add --no-cache git
+FROM golang:1.24.1-alpine AS builder
 
 WORKDIR /app
 
-ENV GOPROXY=https://proxy.golang.org,direct
-ENV GOSUMDB=off
+COPY go.mod ./
 
-COPY order_service/go.mod order_service/go.sum ./
-RUN go mod download
+COPY . .
 
-COPY order_service/cmd ./cmd
-COPY order_service/internal ./internal
-COPY order_service/pkg ./pkg
-
-RUN CGO_ENABLED=0 GOOS=linux go build -o main ./cmd/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -v -o main ./cmd/app/main.go
 
 FROM alpine:latest
-
 
 COPY --from=builder /app/main /app/main
 
