@@ -28,10 +28,3 @@ WORKDIR /app
 EXPOSE 8081
 
 ENTRYPOINT ["/app/main"]
-
-
-
-
-
-
-

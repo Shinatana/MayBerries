@@ -4,7 +4,7 @@ services:
     container_name: auth_service
 
 
-  background_worker:
+  background_worker-service:
     build: ../background_worker
     container_name: background_worker
 
@@ -18,11 +18,8 @@ services:
     build: order_service
     container_name: order_service
     ports:
-       - "8003:8003"
+      - "8003:8003"
 
   reviews_service:
     build: ./Reviews_Service
     container_name: reviews_service
-
-
-
