@@ -1,10 +1,12 @@
 package init
 
 import (
+	"auth_service/pkg/config"
+	"auth_service/pkg/log"
 	"log/slog"
 )
 
-func Log(options *conf.LoggerOptions) {
+func Log(options *config.LoggerOptions) {
 	handlerOptions := map[string]*slog.HandlerOptions{
 		"debug": {Level: slog.LevelDebug},
 		"info":  {Level: slog.LevelInfo},

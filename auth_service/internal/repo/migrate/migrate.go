@@ -1,15 +1,12 @@
 package migrate
 
 import (
-	"auth_service/internal/repo"
 	"auth_service/pkg/config"
 	"auth_service/pkg/log"
 	"auth_service/pkg/misc"
 	"context"
 	"errors"
 	"fmt"
-	"strings"
-
 	"github.com/golang-migrate/migrate/v4"
 )
 
@@ -19,14 +16,12 @@ type migratorImpl struct {
 	DSN            string
 }
 
-func NewMigrator(db *config.DatabaseOptions, migration *config.MigrationOptions) repo.Migrator {
-	m := migratorImpl{}
-
-	m.MigrationFiles = migration.MigrationFiles
-	m.DSN = strings.Replace(misc.GetDSN(db, misc.WithMigratorFormat()), "postgres://", "pgx5://", 1)
-	m.Version = migration.Version
-
-	return &m
+func NewMigrator(db *config.DatabaseOptions, migration *config.MigrationOptions) *migratorImpl {
+	return &migratorImpl{
+		MigrationFiles: migration.MigrationFiles,
+		DSN:            misc.GetDSN(db, misc.WithMigratorFormat()), // без замены на pgx5
+		Version:        migration.Version,
+	}
 }
 
 func (m *migratorImpl) Migrate(ctx context.Context) error {

@@ -1,7 +1,6 @@
 package init
 
 import (
-	"auth_service/internal/repo"
 	"auth_service/internal/repo/migrate"
 	"auth_service/internal/repo/pgsql"
 	"auth_service/pkg/config"
@@ -9,7 +8,7 @@ import (
 	"fmt"
 )
 
-func DB(dbOptions *config.DatabaseOptions, migrationOptions *config.MigrationOptions) (repo.DB, error) {
+func init_db(dbOptions *config.DatabaseOptions, migrationOptions *config.MigrationOptions) (*pgsql.Pgsql, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), dbOptions.InitTimeout)
 	defer cancel()
 
