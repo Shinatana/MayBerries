@@ -1,94 +1,71 @@
-package migrate
+package migrations
 
 import (
-	"auth_service/pkg/config"
-	"auth_service/pkg/log"
-	"auth_service/pkg/misc"
-	"context"
-	"errors"
+	"database/sql"
 	"fmt"
-	"github.com/golang-migrate/migrate/v4"
+
+	"auth_service/pkg/log"
 )
 
-type migratorImpl struct {
-	MigrationFiles string
-	Version        int
-	DSN            string
-}
+func Up(tx *sql.Tx) error {
+	log.Info("⏫ Starting migration: create auth schema")
 
-func NewMigrator(db *config.DatabaseOptions, migration *config.MigrationOptions) *migratorImpl {
-	return &migratorImpl{
-		MigrationFiles: migration.MigrationFiles,
-		DSN:            misc.GetDSN(db, misc.WithMigratorFormat()), // без замены на pgx5
-		Version:        migration.Version,
-	}
-}
-
-func (m *migratorImpl) Migrate(ctx context.Context) error {
-	if m.Version == 0 {
-		log.Info("migrations skipped due to configuration settings", "version", m.Version)
-		return nil
-	}
-
-	errC := make(chan error, 1)
-
-	go func() {
-		defer close(errC)
-		errC <- m.runMigration(ctx)
-	}()
-
-	select {
-	case err := <-errC:
-		return err
-	case <-ctx.Done():
-		select {
-		case err := <-errC:
-			return err
-		default:
-			return ctx.Err()
-		}
-	}
-}
-
-func (m *migratorImpl) runMigration(ctx context.Context) error {
-	migrateInstance, err := migrate.New("file://"+m.MigrationFiles, m.DSN)
-	if err != nil {
-		return fmt.Errorf("failed to create migrate instance: %w", err)
-	}
-	defer func() { _, _ = migrateInstance.Close() }()
-
-	if err = ctx.Err(); err != nil {
-		return err
+	queries := []string{
+		`CREATE TABLE IF NOT EXISTS roles (
+			id SERIAL PRIMARY KEY,
+			name TEXT UNIQUE NOT NULL,
+			description TEXT
+		);`,
+		`CREATE TABLE IF NOT EXISTS permissions (
+			id SERIAL PRIMARY KEY,
+			code TEXT UNIQUE NOT NULL,
+			description TEXT
+		);`,
+		`CREATE TABLE IF NOT EXISTS users (
+			id UUID PRIMARY KEY,
+			email TEXT UNIQUE NOT NULL,
+			password_hash TEXT NOT NULL,
+			name TEXT NOT NULL,
+			role_id INTEGER REFERENCES roles(id) ON DELETE SET NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);`,
+		`CREATE TABLE IF NOT EXISTS roles_permissions (
+			role_id INTEGER REFERENCES roles(id) ON DELETE CASCADE,
+			permission_id INTEGER REFERENCES permissions(id) ON DELETE CASCADE,
+			PRIMARY KEY (role_id, permission_id)
+		);`,
 	}
 
-	log.Debug("migration files path", "path", m.MigrationFiles)
-	version, dirty, err := migrateInstance.Version()
-	log.Info("migration status", "version", version, "dirty", dirty, "error", err)
-
-	if err = ctx.Err(); err != nil {
-		return err
-	}
-
-	if m.Version > 0 {
-		if err = migrateInstance.Migrate(uint(m.Version)); err != nil && !errors.Is(err, migrate.ErrNoChange) {
-			return fmt.Errorf("failed to migrate to version %d: %w", m.Version, err)
-		} else if errors.Is(err, migrate.ErrNoChange) {
-			log.Info("already at requested version", "version", m.Version)
-		} else {
-			log.Info("migrated to specific version", "version", m.Version)
-		}
-	} else {
-		if err = migrateInstance.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
-			return fmt.Errorf("failed to apply migrations: %w", err)
-		} else if errors.Is(err, migrate.ErrNoChange) {
-			log.Info("no migration required")
+	for _, query := range queries {
+		log.Debug("Executing migration query", "sql", query)
+		if _, err := tx.Exec(query); err != nil {
+			log.Error("Failed migration query", "sql", query, "error", err)
+			return fmt.Errorf("migration failed on query: %s\n%w", query, err)
 		}
 	}
 
-	if version1, dirty1, err1 := migrateInstance.Version(); version != version1 {
-		log.Info("new migration status", "version", version1, "dirty", dirty1, "error", err1)
-		log.Info("migration successful")
+	log.Info("✅ Migration complete: auth schema created")
+	return nil
+}
+
+func Down(tx *sql.Tx) error {
+	log.Info("⏬ Starting rollback: drop auth schema")
+
+	queries := []string{
+		`DROP TABLE IF EXISTS roles_permissions;`,
+		`DROP TABLE IF EXISTS users;`,
+		`DROP TABLE IF EXISTS permissions;`,
+		`DROP TABLE IF EXISTS roles;`,
 	}
 
+	for _, query := range queries {
+		log.Debug("Executing rollback query", "sql", query)
+		if _, err := tx.Exec(query); err != nil {
+			log.Error("Failed rollback query", "sql", query, "error", err)
+			return fmt.Errorf("rollback failed on query: %s\n%w", query, err)
+		}
+	}
+
+	log.Info("✅ Rollback complete: auth schema dropped")
 	return nil
 }
